@@ -1,0 +1,37 @@
+h1{
+    text-align: center;
+    background-color: darkgray;
+   
+}
+h2{
+   background-color: crimson;
+}
+div{
+    padding: 20px;
+    vertical-align: top;
+    border: 10px solid ;
+    width: 350px;
+    height: 600px;
+    display: inline-block;
+    overflow: auto;
+   
+}
+.actors{
+    background-repeat: no-repeat;
+
+}
+.p{
+    background: url(./prabhas.jpg);
+}
+.a{
+    background: url(./allu.jpeg);background-size:cover;background-position: center;
+}
+.dq{
+   background: url(./dq.jpeg);background-position: center;background-size: cover;
+}
+.amit{
+   background: url(./amb.jpeg);background-position: center;background-size: cover;
+}
+.r{
+   background: url(./rajini.jpeg);background-position: center;background-size: cover;
+}
