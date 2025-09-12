@@ -8,19 +8,22 @@
     var totalQuantity = 0
     var totalAmount = 0.0
 
-    groupBookings.forEachIndexed { index, groupBooking ->
-        // Calculate individual booking amounts based on its Flexi7 status
-        val flexi7Index = if (groupBooking.isFlexi7Booking) {
-            getFlexi7BookingIndexForUser(userId, groupBooking.timeStamp)
-        } else {
-            -1
-        }
-        
-        val individualIsFlexi7Free = if (groupBooking.isFlexi7Booking) {
-            flexi7Index < 3  // First 3 are free (indices 0, 1, 2)
-        } else {
-            false
-        }
+                // First, get the total count of existing Flexi7 bookings for this user (before this group)
+                val existingFlexi7Count = bookingsRepository.getFlexi7BookingsCount(userId)
+                
+                groupBookings.forEachIndexed { index, groupBooking ->
+                    // Calculate individual booking amounts based on its Flexi7 status
+                    val flexi7Index = if (groupBooking.isFlexi7Booking) {
+                        existingFlexi7Count + index  // Add the index within this group
+                    } else {
+                        -1
+                    }
+                    
+                    val individualIsFlexi7Free = if (groupBooking.isFlexi7Booking) {
+                        flexi7Index < 3  // First 3 are free (indices 0, 1, 2)
+                    } else {
+                        false
+                    }
 
         val individualBaseValue = roundToTwoDecimals(convenienceFee / 1.18)
         val individualDiscountAmount = roundToTwoDecimals(if (individualIsFlexi7Free) individualBaseValue else groupBooking.discountAmount)
@@ -71,34 +74,28 @@
     invoiceData["totalAmount"] = roundTotalAmount(totalAmount)
 }
 
-// ADD this helper method to your BookingsInvoiceFirebase class:
-private suspend fun getFlexi7BookingIndexForUser(userId: String, currentBookingTimestamp: Long): Int {
-    return try {
-        val snapshot = db.collection("bookings").document(userId)
-            .collection("bookings")
-            .whereEqualTo("isFlexi7Booking", true)
-            .whereLessThan("timeStamp", currentBookingTimestamp)
-            .get()
-            .await()
-        snapshot.size()
-    } catch (e: Exception) {
-        Log.e(TAG, "Error counting previous Flexi7 bookings", e)
-        0
-    }
-}
+// Note: No additional helper method needed with the corrected approach above
 
 /*
 EXPLANATION:
-1. For each booking in the group, we now calculate its individual Flexi7 status
-2. We check how many Flexi7 bookings the user had BEFORE this specific booking (using timestamp)
-3. If it's the user's 1st, 2nd, or 3rd Flexi7 booking (index 0, 1, 2), it's free
-4. From 4th booking onwards (index 3+), normal charges apply
+1. First, get the count of existing Flexi7 bookings for the user (before this group)
+2. For each booking in the group, calculate its Flexi7 index as: existingCount + indexInGroup
+3. If the total index is < 3 (indices 0, 1, 2), the booking is free
+4. From index 3 onwards, normal charges apply
 5. Free bookings get: taxableValue=0, cgstAmount=0, sgstAmount=0, totalAmount=0
 6. Paid bookings get: normal tax calculations
 
-EXAMPLE with 4 Flexi7 bookings in a group:
-- Booking 1: flexi7Index=0 → Free (amounts=0)
-- Booking 2: flexi7Index=1 → Free (amounts=0)  
-- Booking 3: flexi7Index=2 → Free (amounts=0)
-- Booking 4: flexi7Index=3 → Paid (normal amounts)
+EXAMPLE - User has 0 existing Flexi7 bookings, making 4 new ones in a group:
+- existingFlexi7Count = 0
+- Booking 1: flexi7Index = 0 + 0 = 0 → Free (amounts=0)
+- Booking 2: flexi7Index = 0 + 1 = 1 → Free (amounts=0)  
+- Booking 3: flexi7Index = 0 + 2 = 2 → Free (amounts=0)
+- Booking 4: flexi7Index = 0 + 3 = 3 → Paid (normal amounts)
+
+EXAMPLE - User has 1 existing Flexi7 booking, making 4 new ones in a group:
+- existingFlexi7Count = 1
+- Booking 1: flexi7Index = 1 + 0 = 1 → Free (amounts=0)
+- Booking 2: flexi7Index = 1 + 1 = 2 → Free (amounts=0)  
+- Booking 3: flexi7Index = 1 + 2 = 3 → Paid (normal amounts)
+- Booking 4: flexi7Index = 1 + 3 = 4 → Paid (normal amounts)
 */
