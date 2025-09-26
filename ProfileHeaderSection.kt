@@ -1,3 +1,11 @@
+import android.content.Context
+import android.graphics.Bitmap
+import android.net.Uri
+import android.util.Log
+import androidx.core.content.FileProvider
+import java.io.File
+import java.io.FileOutputStream
+
 @Composable
 fun ProfileHeaderSection(
     profilePictureUri: Uri?,
@@ -196,7 +204,7 @@ fun ProfilePictureUploader(
         hasCameraPermission = isGranted
         if (isGranted) {
             // Automatically launch camera when permission is granted
-            takePictureLauncher.launch()
+            takePictureLauncher.launch(photoUri)
         }
     }
 
@@ -234,12 +242,47 @@ fun ProfilePictureUploader(
         }
     )
 
+    // Create a temporary file for camera capture
+    val photoFile = remember {
+        File(context.cacheDir, "temp_camera_image_${System.currentTimeMillis()}.jpg")
+    }
+    
+    val photoUri = remember {
+        FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            photoFile
+        )
+    }
+
     val takePictureLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture(),
+        onResult = { success ->
+            if (success && photoFile.exists()) {
+                try {
+                    selectedImageUri = photoUri
+                    onImageSelected(photoUri)
+                    viewModel.setProfilePictureError(false)
+                    viewModel.setProfilePictureErrorNew(false)
+                    Log.d("CameraCapture", "Image captured and saved successfully to: $photoUri")
+                } catch (e: Exception) {
+                    Log.e("CameraCapture", "Error processing captured image: ${e.message}")
+                    showValidationToast("Error processing captured image")
+                }
+            } else {
+                Log.w("CameraCapture", "Camera capture failed or file doesn't exist")
+                showValidationToast("Failed to capture image")
+            }
+        }
+    )
+
+    // Fallback: TakePicturePreview with improved bitmap handling
+    val takePicturePreviewLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicturePreview(),
         onResult = { bitmap: Bitmap? ->
             bitmap?.let {
                 try {
-                    val uri = saveBitmapToUri(context, it)
+                    val uri = saveBitmapToInternalStorage(context, it)
                     uri?.let { validUri ->
                         selectedImageUri = validUri
                         onImageSelected(validUri)
@@ -392,7 +435,7 @@ fun ProfilePictureUploader(
                                 .clickable {
                                     showDialog = false
                                     if (hasCameraPermission) {
-                                        takePictureLauncher.launch()
+                                        takePictureLauncher.launch(photoUri)
                                     } else {
                                         requestPermissionLauncher.launch(Manifest.permission.CAMERA)
                                     }
@@ -425,4 +468,22 @@ fun ProfilePictureUploader(
     }
 
 
+}
+
+// Helper function to save bitmap to internal storage and return URI
+private fun saveBitmapToInternalStorage(context: Context, bitmap: Bitmap): Uri? {
+    return try {
+        val filename = "camera_image_${System.currentTimeMillis()}.jpg"
+        val file = File(context.cacheDir, filename)
+        
+        val outputStream = FileOutputStream(file)
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 90, outputStream)
+        outputStream.flush()
+        outputStream.close()
+        
+        Uri.fromFile(file)
+    } catch (e: Exception) {
+        Log.e("BitmapSave", "Error saving bitmap: ${e.message}")
+        null
+    }
 }
