@@ -1,3 +1,26 @@
+package com.sts.clanhub.spHome.screen
+
+import android.os.Build
+import android.util.Log
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.test.core.app.ApplicationProvider
+import coil.ImageLoader
+import coil.decode.GifDecoder
+import coil.decode.ImageDecoderDecoder
+import coil.request.ImageRequest
+import coil.request.SuccessResult
+import coil.size.Size
+import com.google.firebase.storage.Firebase
+import com.google.firebase.storage.storage
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
 object VideoPreloader {
     private var preloadedVideos: Triple<String?, String?, String?>? = null
     private var isPreloading = false
@@ -8,9 +31,9 @@ object VideoPreloader {
     private var isShortVideoPrebuffered by mutableStateOf(false)
     private var isSliderVideoPrebuffered by mutableStateOf(false)
     
-    // Loading states for UI
-    private var isInitialLoadComplete by mutableStateOf(false)
-    private var loadingProgress by mutableStateOf(0f)
+    // Loading states for UI - FIXED: Renamed to avoid JVM signature clash
+    private var initialLoadComplete by mutableStateOf(false)
+    private var currentLoadingProgress by mutableStateOf(0f)
 
     fun preloadVideos(onComplete: ((String?, String?, String?) -> Unit)? = null) {
         // If already preloaded, return immediately
@@ -26,7 +49,7 @@ object VideoPreloader {
         if (isPreloading) return
 
         isPreloading = true
-        loadingProgress = 0f
+        currentLoadingProgress = 0f
 
         val storage = Firebase.storage
         val storageRef = storage.reference
@@ -36,7 +59,7 @@ object VideoPreloader {
         val totalVideos = 3
 
         fun updateProgress() {
-            loadingProgress = completedCount.toFloat() / totalVideos.toFloat()
+            currentLoadingProgress = completedCount.toFloat() / totalVideos.toFloat()
         }
 
         fun checkAllCompleted() {
@@ -83,7 +106,7 @@ object VideoPreloader {
                     prebufferJobs.joinAll()
                     
                     withContext(Dispatchers.Main) {
-                        isInitialLoadComplete = true
+                        initialLoadComplete = true
                         
                         // Notify all waiting callbacks
                         preloadCallbacks.forEach { callback ->
@@ -204,9 +227,9 @@ object VideoPreloader {
     fun isShortVideoReady(): Boolean = isShortVideoPrebuffered
     fun isSliderVideoReady(): Boolean = isSliderVideoPrebuffered
     
-    // New functions for UI state management
-    fun getInitialLoadComplete(): Boolean = isInitialLoadComplete
-    fun getCurrentLoadingProgress(): Float = loadingProgress
+    // FIXED: Renamed functions to avoid JVM signature clash
+    fun isInitialLoadComplete(): Boolean = initialLoadComplete
+    fun getLoadingProgress(): Float = currentLoadingProgress
     fun isVideosAvailable(): Boolean = preloadedVideos != null
 
     fun clearPreloadedVideos() {
@@ -214,8 +237,8 @@ object VideoPreloader {
         isFullScreenPrebuffered = false
         isShortVideoPrebuffered = false
         isSliderVideoPrebuffered = false
-        isInitialLoadComplete = false
-        loadingProgress = 0f
+        initialLoadComplete = false
+        currentLoadingProgress = 0f
     }
 }
 

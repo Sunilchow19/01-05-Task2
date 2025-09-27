@@ -38,15 +38,15 @@ fun SPHome(navController: NavController, viewModel: SPHomeViewModel) {
     var isPrebuffering by remember { mutableStateOf(false) }
     
     // New loading states
-    var isInitialVideoLoadComplete by remember { mutableStateOf(VideoPreloader.isInitialLoadComplete()) }
-    var videoLoadingProgress by remember { mutableStateOf(VideoPreloader.getLoadingProgress()) }
+    var isInitialVideoLoadComplete by remember { mutableStateOf(VideoPreloader.getInitialLoadComplete()) }
+    var videoLoadingProgress by remember { mutableStateOf(VideoPreloader.getCurrentLoadingProgress()) }
     
     // Monitor video loading progress
     LaunchedEffect(Unit) {
         while (!isInitialVideoLoadComplete) {
             delay(100) // Check every 100ms
-            isInitialVideoLoadComplete = VideoPreloader.isInitialLoadComplete()
-            videoLoadingProgress = VideoPreloader.getLoadingProgress()
+            isInitialVideoLoadComplete = VideoPreloader.getInitialLoadComplete()
+            videoLoadingProgress = VideoPreloader.getCurrentLoadingProgress()
             
             // Update individual video readiness states
             isFullScreenVideoReady = VideoPreloader.isFullScreenVideoReady()
